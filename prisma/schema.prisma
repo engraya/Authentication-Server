@@ -1,0 +1,53 @@
+// prisma/schema.prisma
+// ─────────────────────────────────────────────────────────────────────
+// The Prisma schema is the SINGLE SOURCE OF TRUTH for our database. From it
+// Prisma:
+//   1. generates a fully-typed client (`@prisma/client`) — TypeScript knows
+//      every table and column, so DB queries are checked at compile time.
+//   2. generates SQL MIGRATIONS that create/alter the actual Postgres tables.
+//
+// We keep the model MINIMAL on purpose. Later phases ADD fields via new
+// migrations (role → Phase 10, email-verification → Phase 11, refresh tokens
+// → Phase 8). Evolving the schema incrementally is a real production skill.
+// ─────────────────────────────────────────────────────────────────────
+
+// The generator: what Prisma produces from this schema.
+generator client {
+  provider = "prisma-client-js"
+}
+
+// The datasource: which database, and where. The URL is read from the
+// environment (never hard-coded) — the Twelve-Factor config principle.
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Our first table. Each field maps to a column; attributes (@) add constraints.
+model User {
+  // A UUID primary key. WHY UUID over an auto-increment integer?
+  //  - Non-guessable: an attacker can't enumerate users by trying 1,2,3...
+  //  - Safe to expose in URLs/tokens; no info leak about how many users exist.
+  id String @id @default(uuid())
+
+  // The login identifier. @unique creates a UNIQUE INDEX in Postgres, so the
+  // DATABASE itself guarantees no two users share an email — even under a race
+  // condition where two requests check "is it taken?" at the same instant.
+  email String @unique
+
+  // We NEVER store the raw password. This holds the bcrypt HASH (Phase 5
+  // explains the algorithm in depth). Named `passwordHash`, not `password`,
+  // so the code can never be mistaken about what it contains.
+  passwordHash String
+
+  // Optional display name. `?` makes the column nullable.
+  name String?
+
+  // Audit timestamps. @default(now()) sets createdAt on insert; @updatedAt
+  // makes Prisma bump updatedAt automatically on every update.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Explicit table name (snake_case is the SQL convention).
+  @@map("users")
+}

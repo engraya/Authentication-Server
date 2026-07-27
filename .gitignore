@@ -1,0 +1,39 @@
+# ── Dependencies ────────────────────────────────────────────────
+# node_modules is huge, machine-specific, and fully reproducible from
+# package.json + package-lock.json. Never commit it.
+node_modules/
+
+# ── Build output ────────────────────────────────────────────────
+# Compiled JavaScript emitted by `tsc`. It is a derived artifact of
+# src/, so it must never live in source control.
+dist/
+build/
+
+# ── Secrets & environment ───────────────────────────────────────
+# .env holds real secrets (DB URL, JWT secret, Resend key). Committing
+# it is one of the most common real-world security breaches.
+# We DO commit .env.example (no real values) as documentation.
+.env
+.env.*
+!.env.example
+
+# ── Logs ────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ── Coverage & test artifacts ───────────────────────────────────
+coverage/
+.nyc_output/
+
+# ── Editor / OS noise ───────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# ── Prisma (added in Phase 4) ───────────────────────────────────
+# The generated Prisma client lives in node_modules, already ignored.
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat

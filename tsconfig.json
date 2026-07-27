@@ -1,0 +1,41 @@
+{
+  // ────────────────────────────────────────────────────────────────
+  // tsconfig.json — the contract between YOU and the TypeScript compiler.
+  // Every option below is a deliberate decision. See docs/02-TypeScript.md
+  // for the full reasoning behind each one.
+  // ────────────────────────────────────────────────────────────────
+  "compilerOptions": {
+    // ── Language & module output ──────────────────────────────────
+    "target": "ES2022",              // Node 20+ supports modern JS natively; no need to down-level.
+    "module": "NodeNext",            // Use Node's real module resolution rules.
+    "moduleResolution": "NodeNext",  // Resolve imports the way Node actually does at runtime.
+    "lib": ["ES2022"],               // Type definitions for the JS features we target (no DOM — this is a server).
+
+    // ── Where code lives and where it compiles to ─────────────────
+    "rootDir": "src",                // Source of truth.
+    "outDir": "dist",                // Compiled JavaScript lands here (git-ignored).
+
+    // ── Strictness: the whole point of using TypeScript ───────────
+    "strict": true,                  // Master switch: turns on all the checks below and more.
+    "noImplicitAny": true,           // Ban silent `any`; every value must have a known type.
+    "strictNullChecks": true,        // null/undefined are NOT assignable to everything — forces null handling.
+    "noUncheckedIndexedAccess": true,// arr[i] is `T | undefined` — models reality (index may miss).
+    "noImplicitReturns": true,       // Every code path in a function must return consistently.
+    "noFallthroughCasesInSwitch": true, // Catch missing `break` in switch statements.
+    "noUnusedLocals": true,          // Dead local variables become errors — keeps code clean.
+    "noUnusedParameters": true,      // Prefix intentionally-unused params with `_`.
+    "exactOptionalPropertyTypes": true, // `x?: string` means "absent", not "present and undefined".
+
+    // ── Interop & ergonomics ──────────────────────────────────────
+    "esModuleInterop": true,         // Lets `import express from "express"` work with CommonJS packages.
+    "forceConsistentCasingInFileNames": true, // ./User vs ./user matters on Linux (Render) even if not on Windows.
+    "resolveJsonModule": true,       // Allow `import pkg from "../package.json"`.
+    "skipLibCheck": true,            // Don't type-check .d.ts files in node_modules — faster, avoids 3rd-party noise.
+
+    // ── Source maps & declarations ────────────────────────────────
+    "sourceMap": true,               // Map compiled JS back to TS for readable stack traces/debugging.
+    "declaration": false             // We ship an app, not a library — no need to emit .d.ts files.
+  },
+  "include": ["src/**/*.ts"],        // Only compile our source.
+  "exclude": ["node_modules", "dist", "tests"] // Never compile deps, output, or (for now) tests.
+}
