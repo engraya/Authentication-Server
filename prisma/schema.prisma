@@ -20,7 +20,12 @@ generator client {
 // environment (never hard-coded) — the Twelve-Factor config principle.
 datasource db {
   provider = "postgresql"
+  // The app uses the POOLED connection (many short-lived queries).
   url      = env("DATABASE_URL")
+  // Migrations use a DIRECT (unpooled) connection — Prisma's schema engine
+  // can't run through a PgBouncer pool (e.g. Neon's -pooler host). Falls back
+  // to DATABASE_URL if DIRECT_URL isn't set (fine for non-pooled providers).
+  directUrl = env("DIRECT_URL")
 }
 
 // Our first table. Each field maps to a column; attributes (@) add constraints.
@@ -40,6 +45,14 @@ model User {
   // so the code can never be mistaken about what it contains.
   passwordHash String
 
+  // Authorization role (Phase 10). @default(USER) so every new account is a
+  // normal user; elevation to ADMIN is a deliberate act. Enum defined below.
+  role Role @default(USER)
+
+  // Whether the user has proven they own this email (Phase 11). Starts false;
+  // set true when they click the verification link.
+  isEmailVerified Boolean @default(false)
+
   // Optional display name. `?` makes the column nullable.
   name String?
 
@@ -48,6 +61,89 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // One user has many refresh tokens (one per device/session, plus rotated
+  // history). This is the "1" side of a one-to-many relation.
+  refreshTokens RefreshToken[]
+
+  // One-time tokens for email verification / password reset (Phases 11–12).
+  verificationTokens VerificationToken[]
+
   // Explicit table name (snake_case is the SQL convention).
   @@map("users")
+}
+
+// Authorization roles (Phase 10). An enum becomes a real Postgres ENUM type and
+// a TypeScript union in the generated client — so an invalid role is impossible
+// at both the DB and compile-time layers. Add roles here as the app grows.
+enum Role {
+  USER
+  ADMIN
+}
+
+// A long-lived, OPAQUE refresh token (Phase 8). We store only a HASH of the
+// token, never the raw value — so a database leak can't be used to steal
+// sessions (same reasoning as passwords, docs 11).
+model RefreshToken {
+  id String @id @default(uuid())
+
+  // SHA-256 hash (hex) of the raw token. @unique so we can look a token up by
+  // its hash in O(1) and guarantee no collisions. The RAW token lives only in
+  // the client's httpOnly cookie.
+  tokenHash String @unique
+
+  // Owner of the token. onDelete: Cascade => deleting a user removes their
+  // tokens automatically (referential integrity).
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // When this token stops being valid on its own.
+  expiresAt DateTime
+
+  // Set when the token is invalidated (logout, or rotated away). A token is
+  // "active" only while revokedAt is null AND expiresAt is in the future.
+  revokedAt DateTime?
+
+  // ROTATION trail: when this token is rotated, we record the hash of the token
+  // that replaced it. Presenting a token that was already replaced signals
+  // REUSE (possible theft) — see docs 11/12.
+  replacedByHash String?
+
+  createdAt DateTime @default(now())
+
+  // Index by user so "revoke all of a user's tokens" is fast.
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// A single-use, expiring token for email verification or password reset
+// (Phases 11–12). Like refresh tokens, we store only a SHA-256 HASH; the raw
+// token travels in the emailed link. One model serves both flows via `type`.
+model VerificationToken {
+  id String @id @default(uuid())
+
+  // SHA-256 hash (hex) of the raw token — indexable, and leak-safe.
+  tokenHash String @unique
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Which flow this token is for — prevents using a reset token to verify email
+  // or vice-versa.
+  type VerificationTokenType
+
+  expiresAt DateTime
+
+  // Set when consumed. A token is valid only while usedAt is null AND not
+  // expired — enforcing SINGLE USE (blocks replay).
+  usedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("verification_tokens")
+}
+
+enum VerificationTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
 }

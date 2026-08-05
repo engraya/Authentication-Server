@@ -25,8 +25,33 @@ export const userRepository = {
     return prisma.user.findUnique({ where: { email } });
   },
 
+  /** Find a user by id, or null. Used after refreshing to mint a new token. */
+  async findById(id: string): Promise<User | null> {
+    return prisma.user.findUnique({ where: { id } });
+  },
+
   /** Insert a new user row and return it. */
   async create(data: CreateUserData): Promise<User> {
     return prisma.user.create({ data });
+  },
+
+  /** Replace a user's stored password hash (used by rehash-on-login upgrades). */
+  async updatePasswordHash(id: string, passwordHash: string): Promise<void> {
+    await prisma.user.update({ where: { id }, data: { passwordHash } });
+  },
+
+  /** List all users, newest first (admin-only feature). */
+  async list(): Promise<User[]> {
+    return prisma.user.findMany({ orderBy: { createdAt: "desc" } });
+  },
+
+  /** Mark a user's email as verified (Phase 11). */
+  async markEmailVerified(id: string): Promise<void> {
+    await prisma.user.update({ where: { id }, data: { isEmailVerified: true } });
+  },
+
+  /** Update a user's editable profile fields and return the updated row. */
+  async updateProfile(id: string, data: { name: string }): Promise<User> {
+    return prisma.user.update({ where: { id }, data });
   },
 };

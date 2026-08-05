@@ -16,6 +16,7 @@ import express, {
   type Response,
   type NextFunction,
 } from "express";
+import cookieParser from "cookie-parser";
 
 import { config } from "./config";
 import { logger } from "./utils/logger";
@@ -28,6 +29,8 @@ const app: Application = express();
 
 // ── 1. GLOBAL MIDDLEWARE ────────────────────────────────────────────
 app.use(express.json({ limit: "10kb" }));
+// Parses the Cookie header into req.cookies (needed to read the refresh token).
+app.use(cookieParser());
 
 app.use((req: Request, _res: Response, next: NextFunction) => {
   logger.info(`${req.method} ${req.originalUrl}`);

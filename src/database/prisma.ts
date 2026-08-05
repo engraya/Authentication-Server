@@ -40,10 +40,27 @@ if (config.isDevelopment) {
   globalThis.__prisma__ = prisma;
 }
 
-/** Verify connectivity at boot so a bad DATABASE_URL fails fast, loudly. */
-export async function connectDatabase(): Promise<void> {
-  await prisma.$connect();
-  logger.info("Database connected (PostgreSQL via Prisma).");
+/**
+ * Verify connectivity at boot. We RETRY with backoff because serverless
+ * Postgres (e.g. Neon) auto-suspends when idle; the first connection has to
+ * WAKE it, and a single attempt can time out mid-wake (Prisma error P1001).
+ * Retrying briefly turns a transient cold-start into a successful boot, while a
+ * genuinely bad DATABASE_URL still fails after the attempts are exhausted.
+ */
+export async function connectDatabase(retries = 5, delayMs = 3000): Promise<void> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await prisma.$connect();
+      logger.info("Database connected (PostgreSQL via Prisma).");
+      return;
+    } catch (err) {
+      if (attempt === retries) throw err; // out of tries → let boot fail loudly
+      logger.warn(
+        `Database not reachable (attempt ${attempt}/${retries}) — retrying in ${delayMs}ms...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
 }
 
 /** Close the pool cleanly during graceful shutdown (see server.ts). */
