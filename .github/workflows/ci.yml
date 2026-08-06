@@ -1,0 +1,52 @@
+# .github/workflows/ci.yml
+# ─────────────────────────────────────────────────────────────────────
+# Continuous Integration (Phase 17 / docs 28). On every push and pull request
+# to main, GitHub spins up a fresh Ubuntu runner and proves the code still
+# installs, type-checks, and passes the whole test suite. A red run blocks the
+# merge — so `main` stays green and deployable.
+#
+# No secrets are needed: the tests mock the DB (docs 25) and get fake config
+# from vitest.config.ts, and `prisma generate` reads only the schema.
+# ─────────────────────────────────────────────────────────────────────
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Type-check & test
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Get the code onto the runner.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Install Node 20 and cache the npm download store for speed.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # 3. Install EXACTLY the lockfile — reproducible, and fails if package.json
+      #    and package-lock.json have drifted out of sync.
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Generate the Prisma client so the TypeScript that imports it compiles.
+      #    (Reads the schema only — no database connection required.)
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      # 5. Compile-time safety: the whole project must type-check.
+      - name: Type-check
+        run: npm run typecheck
+
+      # 6. Run the unit + integration suite (Vitest + Supertest).
+      - name: Run tests
+        run: npm test

@@ -53,6 +53,20 @@ function optionalString(key: string, fallback: string): string {
 }
 
 /**
+ * Read a COMMA-SEPARATED list into a string[] (trimmed, empties dropped).
+ * Used for the CORS allowlist: CORS_ORIGIN="https://app.com,https://admin.app.com".
+ * Falls back to the given default list when the var is absent.
+ */
+function readList(key: string, fallback: string[]): string[] {
+  const raw = process.env[key];
+  if (raw === undefined || raw.trim() === "") return fallback;
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s !== "");
+}
+
+/**
  * Read a REQUIRED secret and enforce a minimum length. A short JWT signing
  * secret can be brute-forced, letting an attacker FORGE valid tokens — so a
  * weak secret is a real vulnerability we refuse to boot with (docs 09).
@@ -128,6 +142,32 @@ export const config = {
     // hardware — measure so a login hash stays ≈250–500ms (see docs 14). Bounded
     // to [10, 15]: below 10 is too weak today; above 15 is impractically slow.
     bcryptCostFactor: readIntInRange("BCRYPT_COST", 12, 10, 15),
+    // Rate limiting (Phase 15). A rolling window per client IP: too many
+    // requests inside the window → 429. Two tiers — a broad cap on the whole
+    // API, and a much stricter cap on the sensitive auth endpoints (login,
+    // register, password reset) where abuse means brute-force / spam.
+    rateLimit: {
+      // Window length in ms (default 15 minutes).
+      windowMs: readInt("RATE_LIMIT_WINDOW_MS", 15 * 60 * 1000),
+      // Max requests per IP per window across the whole API.
+      max: readInt("RATE_LIMIT_MAX", 100),
+      // Max requests per IP per window on sensitive auth routes (tighter).
+      authMax: readInt("AUTH_RATE_LIMIT_MAX", 10),
+    },
+  },
+  cors: {
+    // The allowlist of browser origins permitted to call this API. A cross-site
+    // SPA must be listed here or the browser blocks its requests. Default to the
+    // common local dev origins (Next.js :3000, Vite :5173) so dev works out of
+    // the box; set CORS_ORIGIN in production to your real frontend origin(s).
+    origins: readList("CORS_ORIGIN", [
+      "http://localhost:3000",
+      "http://localhost:5173",
+    ]),
+    // Allow the browser to send credentials (our refresh cookie) cross-origin.
+    // Required for the refresh flow to work from a different-origin SPA — and
+    // why we can never use a wildcard origin (docs 13/26).
+    credentials: true,
   },
   jwt: {
     // The secret used to SIGN and VERIFY access tokens (HMAC/HS256). REQUIRED,

@@ -1,0 +1,31 @@
+# Files NOT to send into the Docker build context (docs 27). A smaller context
+# means faster builds and no risk of leaking local artifacts/secrets into image
+# layers. Mirrors .gitignore, plus a few build-only extras.
+
+# Dependencies & build output — reinstalled/rebuilt inside the image.
+node_modules
+dist
+build
+
+# Secrets — NEVER copy .env into an image layer. Config is injected at runtime.
+.env
+.env.*
+!.env.example
+
+# Version control & CI.
+.git
+.gitignore
+.github
+
+# Tests, coverage, and docs aren't needed to RUN the app.
+tests
+coverage
+docs
+
+# Editor / OS noise & logs.
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*

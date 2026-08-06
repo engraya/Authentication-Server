@@ -14,6 +14,12 @@
 // The generator: what Prisma produces from this schema.
 generator client {
   provider = "prisma-client-js"
+  // Which platform(s) the query-engine binary is built for. "native" = whatever
+  // machine runs `prisma generate` (our dev box). We ALSO build for Debian +
+  // OpenSSL 3 because our Docker image / Render runtime is Debian 12 — without
+  // this, the generated client can't find a matching engine there and crashes at
+  // runtime ("Query engine binary for current platform not found"). (docs 29)
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 // The datasource: which database, and where. The URL is read from the

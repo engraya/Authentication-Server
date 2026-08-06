@@ -1,0 +1,50 @@
+# render.yaml — Render Blueprint (Infrastructure as Code) for the Auth Server.
+# (Phase 17 / docs 29). Committing this lets Render provision the service from
+# the repo instead of clicking through the dashboard — the deploy is versioned
+# and reviewable like any other code.
+#
+# This is the NON-Docker (native buildpack) path: Render runs the build/start
+# commands directly on a Node runtime. The Dockerfile is the alternative,
+# portable path (docs 27) — pick ONE. This file uses Render's native Node env.
+services:
+  - type: web
+    name: authentication-server
+    runtime: node
+    plan: free # free instances SLEEP when idle → cold starts (docs 29)
+    region: oregon
+    branch: main
+
+    # Install + compile. `npm ci` is reproducible; `build` = prisma generate + tsc.
+    buildCommand: npm ci && npm run build
+
+    # Runs ONCE per deploy, AFTER build, BEFORE the new instance goes live — the
+    # right place for migrations (not per-instance startup). Uses DIRECT_URL.
+    preDeployCommand: npm run db:deploy # prisma migrate deploy
+
+    # Boot the compiled server. Render injects PORT; our config reads it.
+    startCommand: npm run start
+
+    # Render polls this and only routes traffic once it returns 200 (docs 29).
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      # Secrets: `sync: false` means "prompt me in the dashboard; don't store the
+      # value in the repo." NEVER commit real secrets to render.yaml.
+      - key: DATABASE_URL # pooled connection (app runtime)
+        sync: false
+      - key: DIRECT_URL # unpooled connection (migrations)
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: APP_URL # your deployed frontend/base URL for emailed links
+        sync: false
+      - key: CORS_ORIGIN # allowlisted browser origin(s), comma-separated
+        sync: false
