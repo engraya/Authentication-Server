@@ -14,16 +14,6 @@ services:
     region: oregon
     branch: main
 
-    # Install + compile. `npm ci` is reproducible; `build` = prisma generate + tsc.
-    buildCommand: npm ci && npm run build
-
-    # Runs ONCE per deploy, AFTER build, BEFORE the new instance goes live — the
-    # right place for migrations (not per-instance startup). Uses DIRECT_URL.
-    preDeployCommand: npm run db:deploy # prisma migrate deploy
-
-    # Boot the compiled server. Render injects PORT; our config reads it.
-    startCommand: npm run start
-
     # Render polls this and only routes traffic once it returns 200 (docs 29).
     healthCheckPath: /health
 
