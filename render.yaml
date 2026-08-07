@@ -9,7 +9,7 @@
 services:
   - type: web
     name: authentication-server
-    runtime: node
+    runtime: docker
     plan: free # free instances SLEEP when idle → cold starts (docs 29)
     region: oregon
     branch: main
